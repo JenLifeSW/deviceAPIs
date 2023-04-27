@@ -1,7 +1,6 @@
+from PySide6.QtCore import QThread
 import seatease.spectrometers as st
 import seabreeze.spectrometers as sb
-from PySide6.QtCore import QThread
-
 
 class Spectrometer(QThread):
     def __init__(self, virtual=False):
