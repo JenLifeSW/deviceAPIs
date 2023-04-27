@@ -2,9 +2,14 @@ from PySide6.QtCore import QThread
 import seatease.spectrometers as st
 import seabreeze.spectrometers as sb
 
+
 class Spectrometer(QThread):
-    def __init__(self, virtual=False):
-        self.spec = st.Spectrometer.from_first_available() if virtual else sb.Spectrometer.from_first_available()
+    def __init__(self, isVirtual=False):
+        super().__init__()
+        self.isVirtual = isVirtual
+
+    def run(self):
+        self.spec = st.Spectrometer.from_first_available() if self.isVirtual else sb.Spectrometer.from_first_available()
         self.setIntegrationTime(100000)
 
     def setIntegrationTime(self, value):
