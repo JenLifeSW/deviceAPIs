@@ -22,7 +22,8 @@ class Laser(QThread):
         self.laser.turnOff()
 
     def getCurrent(self):
-        return self.laser.getCurrent()
+        current = self.laser.getCurrent()
+        self.currentSignal.emit(current)
 
 
 class LaserAPI(QSerialPort):
