@@ -1,17 +1,28 @@
 from PySide6.QtSerialPort import *
-from PySide6.QtCore import QThread, QIODeviceBase
+from PySide6.QtCore import QThread, QIODeviceBase, QTimer, Signal
 
 
 class Laser(QThread):
-    def __init__(self):
+    currentSignal = Signal(float)
+
+    def __init__(self, signalInterval):
         super().__init__()
+        self.signalInterval = signalInterval
+        self.timer = QTimer()
+
+    def run(self):
         self.laser = LaserAPI()
+        self.timer.timeout.connect(self.getCurrent)
+        self.timer.start(self.signalInterval)
 
     def turnOn(self):
         self.laser.turnOn()
 
     def turnOff(self):
         self.laser.turnOff()
+
+    def getCurrent(self):
+        return self.laser.getCurrent()
 
 
 class LaserAPI(QSerialPort):
@@ -176,3 +187,10 @@ class LaserAPI(QSerialPort):
             self.Operation_Time = info[3]
             self.ON_Times = info[4]
         return info
+
+    def getCurrent(self):
+        read = self.getRead()
+        if read:
+            return read[4]
+        else:
+            return 0.0
