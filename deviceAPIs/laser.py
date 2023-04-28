@@ -3,17 +3,20 @@ from PySide6.QtCore import QThread, QIODeviceBase, QTimer, Signal
 
 
 class Laser(QThread):
+    laserConnected = Signal(bool)
     currentSignal = Signal(float)
 
     def __init__(self, signalInterval):
         super().__init__()
-        self.signalInterval = signalInterval
-        self.timer = QTimer()
-
-    def run(self):
-        self.laser = LaserAPI()
-        self.timer.timeout.connect(self.getCurrent)
-        self.timer.start(self.signalInterval)
+        try:
+            self.laser = LaserAPI()
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.getCurrent)
+            self.timer.start(signalInterval)
+            self.laserConnected.emit(True)
+        except CanNotConnectLaserException as e:
+            print(e)
+            self.laserConnected.emit(False)
 
     def turnOn(self):
         self.laser.turnOn()
@@ -81,7 +84,7 @@ class LaserAPI(QSerialPort):
                 break
 
         if not self.isOpen():
-            print("레이저 장치를 찾지 못했습니다.")
+            raise CanNotConnectLaserException()
 
     def sendCommand(self, command, logPrint=True, delay=1):
         if self.isOpen():
@@ -198,3 +201,8 @@ class LaserAPI(QSerialPort):
             return read[4]
         else:
             return 0.0
+
+
+class CanNotConnectLaserException(Exception):
+    def __init__(self):
+        super().__init__("레이저 모듈에 연결하지 못 했습니다.")
