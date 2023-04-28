@@ -74,11 +74,14 @@ class LaserAPI(QSerialPort):
 
         for info in portInfos:
             if "Silicon Labs" in info.manufacturer():
-                portName = info.portName().strip("$").strip()
+                portName = info.portName()
                 self.setBaudRate(115200)
                 self.setPortName(portName)
                 self.openCOM()
                 break
+
+        if not self.isOpen():
+            print("레이저 장치를 찾지 못했습니다.")
 
     def sendCommand(self, command, logPrint=True, delay=1):
         if self.isOpen():
