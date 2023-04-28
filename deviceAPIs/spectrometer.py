@@ -27,3 +27,6 @@ class Spectrometer():
 
     def getIntensities(self):
         return self.getSpectrum()[1]
+
+    def getRamanShift(self, laserWavelength):
+        return (1 / laserWavelength - 1 / self.getWavelength()) * (10 ** 7)
