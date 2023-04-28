@@ -35,7 +35,7 @@ class Stage(QThread):
         self.moveToPositions = [0 for _ in range(numberOfStages)]
         self.moveTimers = [QTimer() for _ in range(numberOfStages)]
         for idx, timer in enumerate(self.moveTimers):
-            timer.timeout.connect(lambda: self.move(idx))
+            timer.timeout.connect(lambda: self.moveCheck(idx))
         self.stageMovedSignals = [Signal() for _ in range(numberOfStages)]
 
     def setStepSize(self, idx, size):
@@ -56,14 +56,11 @@ class Stage(QThread):
         self.driveTimers[idx].stop()
 
     def moveTo(self, idx, position):
-        self.moveToPositions[idx] = position
+        self.stages[idx].move_to(position)
         self.moveTimers[idx].start(100)
 
-    def move(self, idx):
-        if abs(self.stages[idx].get_position(True) - self.moveToPositions[idx]) * 1000 > self.stepSize[idx]:
-            direction = "-" if self.stages[idx].get_position(True) > self.moveToPositions[idx] else "+"
-            self.jog(idx, direction)
-        else:
+    def moveCheck(self, idx):
+        if self.stages[idx].get_status() == "enabled":
             self.moveTimers[idx].stop()
             self.stageMovedSignals[idx].emit()
 
