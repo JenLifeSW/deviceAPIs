@@ -1,20 +1,26 @@
 import seatease.spectrometers as st
 import seabreeze.spectrometers as sb
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QThread, QTimer, Signal, Slot
 
 
-class Spectrometer():
-    spectrometerConnected = Signal(bool)
+class Spectrometer(QThread):
+    connectedSignal = Signal(bool)
+    infoSignal = Signal(list)
+    ramanSignal = Signal(list)
 
-    def __init__(self, isVirtual=False):
+    def __init__(self, signalInterval=1000, isVirtual=False):
         super().__init__()
         try:
             self.spec = st.Spectrometer.from_first_available() if isVirtual else sb.Spectrometer.from_first_available()
             self.setIntegrationTime(100000)
-            self.spectrometerConnected.emit(True)
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.emitInfoSignal)
+            self.timer.start(signalInterval)
+            self.connectedSignal.emit(True)
+
         except Exception as e:
             print("스펙트로미터 장치에 연결할 수 없습니다.", e)
-            self.spectrometerConnected.emit(False)
+            self.connectedSignal.emit(False)
 
     def setIntegrationTime(self, value):
         self.spec.integration_time_micros(value)
@@ -22,11 +28,12 @@ class Spectrometer():
     def getSpectrum(self):
         return self.spec.spectrum()
 
-    def getWavelength(self):
-        return self.getSpectrum()[0]
+    @Slot()
+    def emitInfoSignal(self):
+        info = self.getSpectrum()
+        self.infoSignal.emit(info)
 
-    def getIntensities(self):
-        return self.getSpectrum()[1]
-
+    @Slot(float)
     def getRamanShift(self, laserWavelength):
-        return (1 / laserWavelength - 1 / self.getWavelength()) * (10 ** 7)
+        ramanShift = (1 / laserWavelength - 1 / self.getSpectrum()[0]) * (10 ** 7)
+        self.ramanSignal.emit(ramanShift)

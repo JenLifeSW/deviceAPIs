@@ -1,31 +1,38 @@
 from PySide6.QtSerialPort import *
-from PySide6.QtCore import QThread, QIODeviceBase, QTimer, Signal
+from PySide6.QtCore import QThread, QIODeviceBase, QTimer, Signal, Slot
 
 
 class Laser(QThread):
-    laserConnected = Signal(bool)
+    connectedSignal = Signal(bool)
     currentSignal = Signal(float)
 
-    def __init__(self, signalInterval):
+    def __init__(self, signalInterval=1000):
         super().__init__()
         try:
             self.laser = LaserAPI()
             self.timer = QTimer()
-            self.timer.timeout.connect(self.getCurrent)
+            self.timer.timeout.connect(self.emitCurrentSignal)
             self.timer.start(signalInterval)
-            self.laserConnected.emit(True)
+            self.connectedSignal.emit(True)
+
         except CanNotConnectLaserException as e:
             print(e)
-            self.laserConnected.emit(False)
+            self.connectedSignal.emit(False)
 
+    @Slot()
     def turnOn(self):
         self.laser.turnOn()
 
+    @Slot()
     def turnOff(self):
         self.laser.turnOff()
 
     def getCurrent(self):
-        current = self.laser.getCurrent()
+        return self.laser.getCurrent()
+
+    @Slot()
+    def emitCurrentSignal(self):
+        current = self.getCurrent()
         self.currentSignal.emit(current)
 
 

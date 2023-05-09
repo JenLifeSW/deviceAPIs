@@ -1,4 +1,4 @@
-from PySide6.QtCore import QThread, QTimer, Signal
+from PySide6.QtCore import QThread, QTimer, Signal, Slot
 from pylablib.devices import Thorlabs
 
 
@@ -28,37 +28,47 @@ class Stage(QThread):
             self.allStageConnected.emit(False)
 
         self.stepSize = [0.01 for _ in range(numberOfStages)]
+        self.stagePositionSignals = [Signal(float) for _ in range(numberOfStages)]
+
         self.driveDirs = ["+" for _ in range(numberOfStages)]
         self.driveTimers = [QTimer() for _ in range(numberOfStages)]
         for idx, timer in enumerate(self.driveTimers):
             timer.timeout.connect(lambda: self.jog(idx, self.driveDirs[idx]))
+
         self.moveToPositions = [0 for _ in range(numberOfStages)]
         self.moveTimers = [QTimer() for _ in range(numberOfStages)]
         for idx, timer in enumerate(self.moveTimers):
             timer.timeout.connect(lambda: self.moveCheck(idx))
         self.stageMovedSignals = [Signal() for _ in range(numberOfStages)]
 
+    @Slot(int, float)
     def setStepSize(self, idx, size):
         self.stepSize[idx] = size
 
+    @Slot(int)
     def getPosition(self, idx):
         return self.stages[idx].get_position(True) * 1000
 
+    @Slot(int, str)
     def jog(self, idx, direction):
         self.stages[idx].setup_jog(step_size=self.stepSize[idx])
         self.stages[idx].jog(direction, kind="builtin")
 
-    def driveStart(self, idx, direction):
+    @Slot(int, str)
+    def drive(self, idx, direction):
         self.driveDirs[idx] = direction
         self.driveTimers[idx].start(100)
 
+    @Slot(int)
     def driveStop(self, idx):
         self.driveTimers[idx].stop()
 
-    def moveTo(self, idx, position):
+    @Slot(int, float)
+    def move(self, idx, position):
         self.stages[idx].move_to(position)
         self.moveTimers[idx].start(100)
 
+    @Slot(int)
     def moveCheck(self, idx):
         if self.stages[idx].get_status() == "enabled":
             self.moveTimers[idx].stop()
