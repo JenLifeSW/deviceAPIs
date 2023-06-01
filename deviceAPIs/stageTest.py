@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QDoubleSpinBox
 from PySide6.QtCore import QTimer
 from pylablib.devices import Thorlabs
 
@@ -46,7 +46,15 @@ class Window(QMainWindow):
         self.lbStatus = QLabel("status: ")
 
         btnSetEnabled = QPushButton("enable/disable")
-        btnMoveToZero = QPushButton("move to Zero")
+        lytMoveTo = QHBoxLayout()
+        btnMoveTo = QPushButton("move to")
+        self.sboxMoveTo = QDoubleSpinBox()
+        self.sboxMoveTo.setDecimals(3)
+        lbMoveTo = QLabel("mm")
+        lytMoveTo.addWidget(btnMoveTo)
+        lytMoveTo.addWidget(self.sboxMoveTo)
+        lytMoveTo.addWidget(lbMoveTo)
+
         # btnHome = QPushButton("home")
 
         btnJogPlus = QPushButton("jog +")
@@ -56,7 +64,7 @@ class Window(QMainWindow):
 
         ''' 클릭 이벤트 '''
         btnSetEnabled.clicked.connect(self.changeEnable)
-        btnMoveToZero.clicked.connect(self.moveToZero)
+        btnMoveTo.clicked.connect(self.moveTo)
         # btnHome.clicked.connect(self.home)
 
         btnJogPlus.clicked.connect(self.jogPlus)
@@ -71,7 +79,7 @@ class Window(QMainWindow):
         layout.addWidget(self.lbStatus)
 
         layout.addWidget(btnSetEnabled)
-        layout.addWidget(btnMoveToZero)
+        layout.addLayout(lytMoveTo)
         # layout.addWidget(btnHome)
 
         layout.addWidget(btnJogPlus)
@@ -86,9 +94,10 @@ class Window(QMainWindow):
         else:
             self.stage._enable_channel(False)
 
-    def moveToZero(self):
-        print("move to zero")
-        self.stage.move_to(0)
+    def moveTo(self):
+        target = self.sboxMoveTo.value()
+        print(f"move to {target}[mm] = {target/1000}[m]")
+        self.stage.move_to(target/1000)
 
     # def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
     #     print("home")
