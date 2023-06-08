@@ -52,12 +52,22 @@ class Window(QMainWindow):
         if len(devices) < 1:
             print("스테이지를 찾지 못함")
             return False
-        print("스테이지 연결")
 
         self.stage = Thorlabs.KinesisMotor(devices[0][0], "MTS50-Z8")
+        velocity = self.stage._get_velocity_parameters()
+        print(f"스테이지 연결\n"
+              f"min_velocity: {velocity.min_velocity} "
+              f"max_velocity: {velocity.max_velocity} "
+              f"stage accel: {velocity.acceleration} ")
         # self.stage.setup_velocity(min_velocity=0.0000007, max_velocity=0.0000007
-        self.stage.setup_velocity(min_velocity=use_um(0.6), max_velocity=use_um(0.6))
+        self.stage.setup_velocity(min_velocity=use_mm(0.1), max_velocity=use_mm(1), acceleration=use_mm(1))
         self.stage.setup_jog(step_size=use_um(0.1))
+
+        velocity = self.stage._get_velocity_parameters()
+        print(f"setup_velocity\n"
+              f"min_velocity: {velocity.min_velocity} "
+              f"max_velocity: {velocity.max_velocity} "
+              f"stage accel: {velocity.acceleration} ")
         return True
 
     def initUi(self):
@@ -74,11 +84,14 @@ class Window(QMainWindow):
         lytSetInterval = QHBoxLayout()
 
         btnMoveTo = QPushButton("move to")
-        lbMoveTo = QLabel("mm")
+        btnStopMove = QPushButton("stop")
         self.sboxMoveTo = QDoubleSpinBox()
+        lbMoveTo = QLabel("mm")
         self.sboxMoveTo.setDecimals(4)
+        self.sboxMoveTo.setRange(-16.0, 30)
         self.sboxMoveTo.setValue(self.stage.get_position())
         lytMoveTo.addWidget(btnMoveTo)
+        lytMoveTo.addWidget(btnStopMove)
         lytMoveTo.addWidget(self.sboxMoveTo)
         lytMoveTo.addWidget(lbMoveTo)
 
@@ -108,6 +121,7 @@ class Window(QMainWindow):
         ''' 클릭 이벤트 '''
         btnSetEnabled.clicked.connect(self.changeEnable)
         btnMoveTo.clicked.connect(self.moveTo)
+        btnStopMove.clicked.connect(self.stopMove)
         btnSetJogMM.clicked.connect(self.setJogMM)
         btnSetJogUM.clicked.connect(self.setJogUM)
         btnSetInterval.clicked.connect(self.setInterval)
@@ -166,6 +180,9 @@ class Window(QMainWindow):
         print(f"{datetime.now()} start: {formated}mm ({microFormated}um)")
         self.stage.move_to(target/1000)
         self.checkMovingTimer.start(100)
+
+    def stopMove(self):
+        self.stage.stop(immediate=True)
 
     # def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
     #     print("home")
