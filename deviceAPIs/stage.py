@@ -20,7 +20,7 @@ class Stage(QThread):
     stageConnected = [False, False, False]
 
     connectedSignal = Signal(list)
-    stageMovedSignal = Signal(int)
+    stageMovedSignal = Signal(int, float)
     errCannotDetect = Signal(str)
     errPositionLimit = Signal(str)
     nomalLogSignal = Signal(str)
@@ -70,6 +70,13 @@ class Stage(QThread):
         self.moveTimer1.timeout.connect(self.checkMoving1)
         self.moveTimer2.timeout.connect(self.checkMoving2)
 
+    def close(self):
+        for stage in self.stage:
+            stage.close()
+
+    def checkConnected(self):
+        self.connectedSignal.emit(self.stageConnected)
+
     def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
         METHOD = "setLimit"
         print(f"{TAG}#{idx} {METHOD} {bottom}, {top}")
@@ -78,6 +85,9 @@ class Stage(QThread):
             return
 
         self.limit[idx] = (bottom, top)
+
+    def setUpVelocity(self, idx, minV, maxV, acc):
+        self.stage[idx].setup_velocity(min_velocity=minV, max_velocity=maxV, acceleration=acc)
 
     def setUpJog(self, idx, size):
         self.stage[idx].setup_jog(step_size=size)
@@ -167,14 +177,14 @@ class Stage(QThread):
             self.driveTimer2.stop()
 
     def move(self, idx, position):
-        print(f"{TAG}#{idx} {position}, {self.limit[idx][1]}, {self.limit[idx][0]}")
+        # print(f"{TAG}#{idx} {position}, {self.limit[idx][1]}, {self.limit[idx][0]}")
         METHOD = "[move]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
         if self.limit[idx][1] < position or position < self.limit[idx][0]:
-            self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가")
+            self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
             return
 
         self.stage[idx].move_to(position)
@@ -208,8 +218,22 @@ class Stage(QThread):
                 self.moveTimer1.stop()
             else:
                 self.moveTimer2.stop()
-            self.nomalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.stage[idx].get_position()}")
-            self.stageMovedSignal.emit(idx)
+            #self.nomalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
+            self.stageMovedSignal.emit(idx, self.getPosition(idx))
+
+    def stopMove(self, idx):
+        METHOD = "[stopMove]"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
+            return
+
+        self.stage[idx].stop(immediate=False)
+        if idx == 0:
+            self.moveTimer0.stop()
+        elif idx == 1:
+            self.moveTimer1.stop()
+        else:
+            self.moveTimer2.stop()
 
 
 class CanNotDetectSomeDevicesException(Exception):

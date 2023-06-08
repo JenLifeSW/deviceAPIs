@@ -185,7 +185,7 @@ class Window(QMainWindow):
 
     def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
         print("home")
-        self.stage.home(force=True)
+        self.stage.home()
 
     def jogPlus(self):
         #print("jogPlus")
