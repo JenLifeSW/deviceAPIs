@@ -15,16 +15,24 @@ def use_um(value):
 class Stage(QThread):
     numberOfStages = 1
     stage = []
-    limit = [(0, use_mm(0.05)), (0, use_mm(0.05)), (0, use_mm(0.05))]
+    limit = [(0, use_mm(50)), (0, use_mm(50)), (0, use_mm(50))]
     driveDir = ["+", "+", "+"]
     stageConnected = [False, False, False]
+    homed = [False, False, False]
 
     connectedSignal = Signal(list)
+    homeingSignal = Signal()
+    homedSignal = Signal()
+    stoppingSignal = Signal(int)
+    stoppedSignal = Signal(int)
+
     stageMovedSignal = Signal(int, float)
     errCannotDetect = Signal(str)
     errPositionLimit = Signal(str)
     nomalLogSignal = Signal(str)
 
+    homeTimer = QTimer()
+    stopTimer = QTimer()
     driveTimer0 = QTimer()
     driveTimer1 = QTimer()
     driveTimer2 = QTimer()
@@ -62,6 +70,9 @@ class Stage(QThread):
             self.connectedSignal.emit(self.stageConnected)
 
     def initTimer(self):
+        self.homeTimer.timeout.connect(self.checkHome)
+        self.stopTimer.timeout.connect(self.checkStop)
+
         self.driveTimer0.timeout.connect(self.jogToDrive0)
         self.driveTimer1.timeout.connect(self.jogToDrive1)
         self.driveTimer2.timeout.connect(self.jogToDrive2)
@@ -100,6 +111,24 @@ class Stage(QThread):
 
     def getPosition(self, idx):
         return self.stage[idx].get_position()
+
+    def home(self):
+        self.homeingSignal.emit()
+        self.homed = [False for _ in range(self.numberOfStages)]
+
+        for stage in self.stage:
+            stage.home()
+        self.homeTimer.start(self.timerInterval)
+
+    def checkHome(self):
+        for idx, stage in enumerate(self.stage):
+            status = self.stage[idx].get_status()
+            if "homed" in status:
+                self.homed[idx] = True
+
+        if all(self.homed):
+            self.homeTimer.stop()
+            self.homedSignal.emit()
 
     def jog(self, idx, direction):
         '''
