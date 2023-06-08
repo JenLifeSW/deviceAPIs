@@ -59,7 +59,6 @@ class Window(QMainWindow):
               f"min_velocity: {velocity.min_velocity} "
               f"max_velocity: {velocity.max_velocity} "
               f"stage accel: {velocity.acceleration} ")
-        # self.stage.setup_velocity(min_velocity=0.0000007, max_velocity=0.0000007
         self.stage.setup_velocity(min_velocity=use_mm(0.1), max_velocity=use_mm(1), acceleration=use_mm(1))
         self.stage.setup_jog(step_size=use_um(0.1))
 
@@ -111,7 +110,7 @@ class Window(QMainWindow):
         lytSetInterval.addWidget(btnSetInterval)
         lytSetInterval.addWidget(self.sboxSetInterval)
 
-        # btnHome = QPushButton("home")
+        btnHome = QPushButton("home")
 
         btnJogPlus = QPushButton("jog +")
         btnJogMinus = QPushButton("jog -")
@@ -125,7 +124,7 @@ class Window(QMainWindow):
         btnSetJogMM.clicked.connect(self.setJogMM)
         btnSetJogUM.clicked.connect(self.setJogUM)
         btnSetInterval.clicked.connect(self.setInterval)
-        # btnHome.clicked.connect(self.home)
+        btnHome.clicked.connect(self.home)
 
         btnJogPlus.clicked.connect(self.jogPlus)
         btnJogMinus.clicked.connect(self.jogMinus)
@@ -142,7 +141,7 @@ class Window(QMainWindow):
         layout.addLayout(lytMoveTo)
         layout.addLayout(lytSetupJog)
         layout.addLayout(lytSetInterval)
-        # layout.addWidget(btnHome)
+        layout.addWidget(btnHome)
 
         layout.addWidget(btnJogPlus)
         layout.addWidget(btnJogMinus)
@@ -182,11 +181,11 @@ class Window(QMainWindow):
         self.checkMovingTimer.start(100)
 
     def stopMove(self):
-        self.stage.stop(immediate=True)
+        self.stage.stop(immediate=False)
 
-    # def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
-    #     print("home")
-    #     self.stage.home(force=True)
+    def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
+        print("home")
+        self.stage.home(force=True)
 
     def jogPlus(self):
         #print("jogPlus")
