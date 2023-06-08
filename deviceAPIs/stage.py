@@ -173,7 +173,7 @@ class Stage(QThread):
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
-        if self.limit[idx][1] <= position or position <= self.limit[idx][0]:
+        if self.limit[idx][1] < position or position < self.limit[idx][0]:
             self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가")
             return
 
