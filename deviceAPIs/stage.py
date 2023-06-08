@@ -2,12 +2,42 @@ from PySide6.QtCore import QThread, QTimer, Signal, Slot
 from pylablib.devices import Thorlabs
 
 
+TAG = "stage"
+
+def use_mm(value):
+    return value/1000
+
+
+def use_um(value):
+    return value/1000000
+
+
 class Stage(QThread):
-    stages = []
-    allStageConnected = Signal(bool)
+    numberOfStages = 1
+    stage = []
+    limit = [(0, use_mm(0.05)), (0, use_mm(0.05)), (0, use_mm(0.05))]
+    driveDir = ["+", "+", "+"]
+    stageConnected = [False, False, False]
+
+    connectedSignal = Signal(list)
+    stageMovedSignal = Signal(int)
+    errCannotDetect = Signal(str)
+    errPositionLimit = Signal(str)
+    nomalLogSignal = Signal(str)
+
+    driveTimer0 = QTimer()
+    driveTimer1 = QTimer()
+    driveTimer2 = QTimer()
+    moveTimer0 = QTimer()
+    moveTimer1 = QTimer()
+    moveTimer2 = QTimer()
+    timerInterval = 100
 
     def __init__(self, numberOfStages=1):
         super().__init__()
+        self.initDevices(numberOfStages)
+
+    def initDevices(self, numberOfStages):
         devices = []
         try:
             devices = Thorlabs.kinesis.list_kinesis_devices()
@@ -15,64 +45,171 @@ class Stage(QThread):
                 raise CanNotDetectSomeDevicesException()
 
             for idx, device in enumerate(devices):
-                self.stages.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
-                self.stages[idx].setup_velocity(min_velocity=0.0001, max_velocity=0.001)
+                self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
+                self.stage[idx].setup_velocity(min_velocity=use_mm(0.1), max_velocity=use_mm(5))
+                self.stage[idx].setup_jog(step_size=use_mm(1))
+                self.stageConnected[idx] = True
 
-            self.allStageConnected.emit(True)
+            self.numberOfStages = numberOfStages
+            self.initTimer()
 
         except CanNotDetectSomeDevicesException as e:
             print(f"$use: ${numberOfStages}, detected: ${len(devices)}, {e}")
-            self.allStageConnected.emit(False)
         except Exception as e:
             print("\nKinesisMotor에 연결할 수 없습니다.", e)
-            self.allStageConnected.emit(False)
 
-        self.stepSize = [0.01 for _ in range(numberOfStages)]
-        self.stagePositionSignals = [Signal(float) for _ in range(numberOfStages)]
+        finally:
+            self.connectedSignal.emit(self.stageConnected)
 
-        self.driveDirs = ["+" for _ in range(numberOfStages)]
-        self.driveTimers = [QTimer() for _ in range(numberOfStages)]
-        for idx, timer in enumerate(self.driveTimers):
-            timer.timeout.connect(lambda: self.jog(idx, self.driveDirs[idx]))
+    def initTimer(self):
+        self.driveTimer0.timeout.connect(self.jogToDrive0)
+        self.driveTimer1.timeout.connect(self.jogToDrive1)
+        self.driveTimer2.timeout.connect(self.jogToDrive2)
 
-        self.moveToPositions = [0 for _ in range(numberOfStages)]
-        self.moveTimers = [QTimer() for _ in range(numberOfStages)]
-        for idx, timer in enumerate(self.moveTimers):
-            timer.timeout.connect(lambda: self.moveCheck(idx))
-        self.stageMovedSignals = [Signal() for _ in range(numberOfStages)]
+        self.moveTimer0.timeout.connect(self.checkMoving0)
+        self.moveTimer1.timeout.connect(self.checkMoving1)
+        self.moveTimer2.timeout.connect(self.checkMoving2)
 
-    @Slot(int, float)
-    def setStepSize(self, idx, size):
-        self.stepSize[idx] = size
+    def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
+        METHOD = "setLimit"
+        print(f"{TAG}#{idx} {METHOD} {bottom}, {top}")
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
+            return
 
-    @Slot(int)
+        self.limit[idx] = (bottom, top)
+
+    def setUpJog(self, idx, size):
+        self.stage[idx].setup_jog(step_size=size)
+
+    def setEnabled(self, idx, enable=True):
+        self.stage[idx]._enable_channel(enable)
+
+    def isEnabled(self, idx):
+        return "enabled" in self.stage[idx].get_status()
+
     def getPosition(self, idx):
-        return self.stages[idx].get_position(True) * 1000
+        return self.stage[idx].get_position()
 
-    @Slot(int, str)
     def jog(self, idx, direction):
-        self.stages[idx].setup_jog(step_size=self.stepSize[idx])
-        self.stages[idx].jog(direction, kind="builtin")
+        '''
+        direction: "+", "-"
+        '''
+        METHOD = "jog"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
+            return
 
-    @Slot(int, str)
-    def drive(self, idx, direction):
-        self.driveDirs[idx] = direction
-        self.driveTimers[idx].start(100)
+        if direction == "+":
+            if self.limit[idx][1] <= self.getPosition(idx):
+                self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
+                return
+            self.stage[idx].jog("+", kind="builtin")
+        elif direction == "-":
+            if self.getPosition(idx) <= self.limit[idx][0]:
+                self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
+                return
+            self.stage[idx].jog("-", kind="builtin")
 
-    @Slot(int)
+    def jogToDrive0(self): self.jog(0, self.driveDir[0])
+    def jogToDrive1(self): self.jog(1, self.driveDir[1])
+    def jogToDrive2(self): self.jog(2, self.driveDir[2])
+
+    def driveStart(self, idx, direction):
+        '''
+        direction: "+", "-"
+        '''
+        METHOD = "driveStart"
+        '''
+        limit 구현
+        '''
+        moveAble = True
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
+            return
+
+        if direction == "+":
+            if self.limit[idx][1] <= self.getPosition(idx):
+                self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
+                moveAble = False
+        elif direction == "-":
+            if self.getPosition(idx) <= self.limit[idx][0]:
+                self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
+                moveAble = False
+
+        self.driveDir[idx] = direction
+        if moveAble:
+            if idx == 0:
+                self.driveTimer0.start(self.timerInterval)
+            elif idx == 1:
+                self.driveTimer1.start(self.timerInterval)
+            else:
+                self.driveTimer2.start(self.timerInterval)
+        else:
+            if idx == 0:
+                self.driveTimer0.stop()
+            elif idx == 1:
+                self.driveTimer1.stop()
+            else:
+                self.driveTimer2.stop()
+
     def driveStop(self, idx):
-        self.driveTimers[idx].stop()
+        METHOD = "[driveStop]"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
+            return
 
-    @Slot(int, float)
+        if idx == 0:
+            self.driveTimer0.stop()
+        elif idx == 1:
+            self.driveTimer1.stop()
+        else:
+            self.driveTimer2.stop()
+
     def move(self, idx, position):
-        self.stages[idx].move_to(position)
-        self.moveTimers[idx].start(100)
+        print(f"{TAG}#{idx} {position}, {self.limit[idx][1]}, {self.limit[idx][0]}")
+        METHOD = "[move]"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
+            return
 
-    @Slot(int)
-    def moveCheck(self, idx):
-        if self.stages[idx].get_status() == "enabled":
-            self.moveTimers[idx].stop()
-            self.stageMovedSignals[idx].emit()
+        if self.limit[idx][1] <= position or position <= self.limit[idx][0]:
+            self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가")
+            return
+
+        self.stage[idx].move_to(position)
+        if idx == 0:
+            self.moveTimer0.start(self.timerInterval)
+        elif idx == 1:
+            self.moveTimer1.start(self.timerInterval)
+        else:
+            self.moveTimer2.start(self.timerInterval)
+
+    def checkMoving0(self): self.checkMoving(0)
+    def checkMoving1(self): self.checkMoving(1)
+    def checkMoving2(self): self.checkMoving(2)
+
+    def checkMoving(self, idx):
+        METHOD = "[checkMoving]"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
+            return
+
+        status = self.stage[idx].get_status()
+        if (
+                "moving_fw" not in status and
+                "moving_bk" not in status and
+                "jogging_fw" not in status and
+                "jogging_bk" not in status
+        ):
+            if idx == 0:
+                self.moveTimer0.stop()
+            elif idx == 1:
+                self.moveTimer1.stop()
+            else:
+                self.moveTimer2.stop()
+            self.nomalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.stage[idx].get_position()}")
+            self.stageMovedSignal.emit(idx)
 
 
 class CanNotDetectSomeDevicesException(Exception):
