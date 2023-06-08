@@ -24,7 +24,7 @@ class Stage(QThread):
     homeingSignal = Signal()
     homedSignal = Signal()
     stoppingSignal = Signal(int)
-    stoppedSignal = Signal(int)
+    stoppedSignal = Signal(int, float)
 
     stageMovedSignal = Signal(int, float)
     errCannotDetect = Signal(str)
@@ -32,7 +32,6 @@ class Stage(QThread):
     nomalLogSignal = Signal(str)
 
     homeTimer = QTimer()
-    stopTimer = QTimer()
     driveTimer0 = QTimer()
     driveTimer1 = QTimer()
     driveTimer2 = QTimer()
@@ -71,7 +70,6 @@ class Stage(QThread):
 
     def initTimer(self):
         self.homeTimer.timeout.connect(self.checkHome)
-        self.stopTimer.timeout.connect(self.checkStop)
 
         self.driveTimer0.timeout.connect(self.jogToDrive0)
         self.driveTimer1.timeout.connect(self.jogToDrive1)
@@ -87,6 +85,9 @@ class Stage(QThread):
 
     def checkConnected(self):
         self.connectedSignal.emit(self.stageConnected)
+
+    def setTimerInterval(self, interval):
+        self.timerInterval = interval
 
     def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
         METHOD = "setLimit"
@@ -228,13 +229,14 @@ class Stage(QThread):
     def checkMoving1(self): self.checkMoving(1)
     def checkMoving2(self): self.checkMoving(2)
 
-    def checkMoving(self, idx):
+    def checkMoving(self, idx, printLog=False):
         METHOD = "[checkMoving]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
         status = self.stage[idx].get_status()
+        if printLog: print(f"{TAG}#{idx} {METHOD} status: {status}")
         if (
                 "moving_fw" not in status and
                 "moving_bk" not in status and
@@ -249,20 +251,18 @@ class Stage(QThread):
                 self.moveTimer2.stop()
             #self.nomalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
             self.stageMovedSignal.emit(idx, self.getPosition(idx))
+            self.stoppedSignal.emit(idx, self.getPosition(idx))
 
-    def stopMove(self, idx):
+    def stopMove(self, idx, printLog=False):
         METHOD = "[stopMove]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
+        self.stoppingSignal.emit(idx)
+
+        self.checkMoving(idx, printLog)
         self.stage[idx].stop(immediate=False)
-        if idx == 0:
-            self.moveTimer0.stop()
-        elif idx == 1:
-            self.moveTimer1.stop()
-        else:
-            self.moveTimer2.stop()
 
 
 class CanNotDetectSomeDevicesException(Exception):
