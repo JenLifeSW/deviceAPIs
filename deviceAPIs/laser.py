@@ -3,6 +3,7 @@ from PySide6.QtCore import QThread, QIODeviceBase, QTimer, Signal, Slot
 
 
 class Laser(QThread):
+    isConnected = False
     connectedSignal = Signal(bool)
     currentSignal = Signal(float)
 
@@ -13,11 +14,19 @@ class Laser(QThread):
             self.timer = QTimer()
             self.timer.timeout.connect(self.emitCurrentSignal)
             self.timer.start(signalInterval)
+            self.isConnected = True
             self.connectedSignal.emit(True)
 
         except CanNotConnectLaserException as e:
             print(e)
             self.connectedSignal.emit(False)
+
+    def close(self):
+        self.laser.closeCOM()
+
+    @Slot()
+    def checkConnected(self):
+        self.connectedSignal.emit(self.isConnected)
 
     @Slot()
     def turnOn(self):
@@ -93,7 +102,7 @@ class LaserAPI(QSerialPort):
         if not self.isOpen():
             raise CanNotConnectLaserException()
 
-    def sendCommand(self, command, logPrint=True, delay=1):
+    def sendCommand(self, command, logPrint=False, delay=1):
         if self.isOpen():
             self.write(command)
             self.waitForReadyRead(500)
@@ -192,14 +201,14 @@ class LaserAPI(QSerialPort):
         if self.isOpen():
             res = self.sendCommand(self.INFO)
 
-        if not ("<ERR>" in res or "<ACK>" in res):
-            info = res.split("\r\n")
+            if not ("<ERR>" in res or "<ACK>" in res):
+                info = res.split("\r\n")
 
-            self.Firmware = info[0]
-            self.Serial = info[1].split(':')[1]
-            self.Model = info[2].split(':')[1]
-            self.Operation_Time = info[3]
-            self.ON_Times = info[4]
+                self.Firmware = info[0]
+                self.Serial = info[1].split(':')[1]
+                self.Model = info[2].split(':')[1]
+                # self.Operation_Time = info[3]
+                # self.ON_Times = info[4]
         return info
 
     def getCurrent(self):
