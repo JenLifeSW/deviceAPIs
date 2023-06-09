@@ -98,8 +98,8 @@ class Stage(QThread):
 
         self.limit[idx] = (bottom, top)
 
-    def setUpVelocity(self, idx, minV, maxV, acc):
-        self.stage[idx].setup_velocity(min_velocity=minV, max_velocity=maxV, acceleration=acc)
+    def setUpVelocity(self, idx, maxVelocity, acc):
+        self.stage[idx].setup_velocity(max_velocity=maxVelocity, acceleration=acc)
 
     def setUpJog(self, idx, size):
         self.stage[idx].setup_jog(step_size=size)
