@@ -53,7 +53,7 @@ class Stage(QThread):
 
             for idx, device in enumerate(devices):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
-                self.stage[idx].setup_velocity(min_velocity=use_mm(0.1), max_velocity=use_mm(5))
+                self.stage[idx].setup_velocity(max_velocity=use_mm(5))
                 self.stage[idx].setup_jog(step_size=use_mm(1))
                 self.stageConnected[idx] = True
 
