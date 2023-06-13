@@ -250,21 +250,21 @@ class Stage(QThread):
             else:
                 self.moveTimer2.stop()
             #self.normalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
-                if forStop:
-                    self.stoppedSignal.emit(idx, self.getPosition(idx))
-                else:
-                    self.stageMovedSignal.emit(idx, self.getPosition(idx))
+            if forStop:
+                self.stoppedSignal.emit(idx, self.getPosition(idx))
+            else:
+                self.stageMovedSignal.emit(idx, self.getPosition(idx))
 
-        def stopMove(self, idx, printLog=False):
-            METHOD = "[stopMove]"
-            if self.numberOfStages < idx:
-                self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
-                return
+    def stopMove(self, idx, printLog=False):
+        METHOD = "[stopMove]"
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
+            return
 
-            self.stoppingSignal.emit(idx)
+        self.stoppingSignal.emit(idx)
 
-            self.checkMoving(idx, printLog, True)
-            self.stage[idx].stop(immediate=False)
+        self.checkMoving(idx, printLog, True)
+        self.stage[idx].stop(immediate=False)
 
 
 class CanNotDetectSomeDevicesException(Exception):
