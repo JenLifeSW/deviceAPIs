@@ -29,7 +29,7 @@ class Stage(QThread):
     stageMovedSignal = Signal(int, float)
     errCannotDetect = Signal(str)
     errPositionLimit = Signal(str)
-    nomalLogSignal = Signal(str)
+    normalLogSignal = Signal(str)
 
     homeTimer = QTimer()
     driveTimer0 = QTimer()
@@ -249,7 +249,7 @@ class Stage(QThread):
                 self.moveTimer1.stop()
             else:
                 self.moveTimer2.stop()
-            #self.nomalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
+            #self.normalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
             self.stageMovedSignal.emit(idx, self.getPosition(idx))
             self.stoppedSignal.emit(idx, self.getPosition(idx))
 
