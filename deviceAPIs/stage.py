@@ -39,7 +39,7 @@ class Status:
 class Stage(QThread):
     numberOfStages = 1
     stage = []
-    limit = [(0, use_mm(50)), (0, use_mm(50)), (0, use_mm(50))]
+    limit = [(0.0, use_mm(50.0)), (0.0, use_mm(50.0)), (0.0, use_mm(50.0))]
     driveDir = ["+", "+", "+"]
     status = [Status.DISABLED for _ in range(3)]
     homePosition = [0.0, 0.0, 0.0]
@@ -159,12 +159,19 @@ class Stage(QThread):
         if self.status[idx] == Status.MOVING_TO_ZERO:
             self.status[idx] = Status.MOVING_TO_HOME
             self.jog(idx, "+")
-            self.checkMoving(idx)
+            if idx == 0:
+                self.moveTimer0.start(self.timerInterval)
+            elif idx == 1:
+                self.moveTimer1.start(self.timerInterval)
+            else:
+                self.moveTimer2.start(self.timerInterval)
+
             return
 
         if self.status[idx] == Status.MOVING_TO_HOME:
             self.status[idx] = Status.IDLE
             self.homePosition[idx] = self.stage[idx].get_position()
+            self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
             print(f"homePosition: {self.homePosition[idx]}")
             self.homedSignal.emit()
 
@@ -255,7 +262,8 @@ class Stage(QThread):
 
     def move(self, idx, position):
         TAG = "[move]"
-        print(f"{TAG}#{idx} {position}, {Status.get_name(self.status[idx])}")
+        print(f"{TAG}#{idx} {position}, {self.homePosition[idx]}, {Status.get_name(self.status[idx])}")
+        position = position + self.homePosition[idx]
         METHOD = "[move]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
@@ -265,6 +273,7 @@ class Stage(QThread):
             self.driveStart(idx, "-")
 
         if self.limit[idx][1] < position or position < self.limit[idx][0]:
+            print(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
             self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
             return
 
