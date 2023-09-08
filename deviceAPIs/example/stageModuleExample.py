@@ -4,8 +4,10 @@ from datetime import datetime
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, \
     QDoubleSpinBox, QSpinBox
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Slot
 from pylablib.devices import Thorlabs
+
+from deviceAPIs.stage import Status
 
 base_size = 1                   # mm 값 입력
 step_size = base_size / 1000    # 스테이지 전달용 수치 (m 단위로 전달)
@@ -52,19 +54,19 @@ class Window(QMainWindow):
     def initDevice(self):
 
         self.stage = Stage(1)
-        velocity = self.stage.stage[0]._get_velocity_parameters()
-        print(f"스테이지 연결\n"
-              f"min_velocity: {velocity.min_velocity} "
-              f"max_velocity: {velocity.max_velocity} "
-              f"stage accel: {velocity.acceleration} ")
-        self.stage.setUpVelocity(0, use_mm(0.1), use_mm(1), use_mm(1))
-        self.stage.setUpJog(0, use_um(0.1))
-
-        velocity = self.stage.stage[0]._get_velocity_parameters()
-        print(f"setup_velocity\n"
-              f"min_velocity: {velocity.min_velocity} "
-              f"max_velocity: {velocity.max_velocity} "
-              f"stage accel: {velocity.acceleration} ")
+        # velocity = self.stage.stage[0]._get_velocity_parameters()
+        # print(f"스테이지 연결\n"
+        #       f"min_velocity: {velocity.min_velocity} "
+        #       f"max_velocity: {velocity.max_velocity} "
+        #       f"stage accel: {velocity.acceleration} ")
+        # self.stage.setUpVelocity(0, use_mm(0.1), use_mm(1), use_mm(1))
+        # self.stage.setUpJog(0, use_um(0.1))
+        #
+        # velocity = self.stage.stage[0]._get_velocity_parameters()
+        # print(f"setup_velocity\n"
+        #       f"min_velocity: {velocity.min_velocity} "
+        #       f"max_velocity: {velocity.max_velocity} "
+        #       f"stage accel: {velocity.acceleration} ")
         return True
 
     def initUi(self):
@@ -122,7 +124,7 @@ class Window(QMainWindow):
         btnSetJogMM.clicked.connect(self.setJogMM)
         btnSetJogUM.clicked.connect(self.setJogUM)
         btnSetInterval.clicked.connect(self.setInterval)
-        btnHome.clicked.connect(self.home)
+        btnHome.clicked.connect(lambda: self.home(0))
 
         btnJogPlus.clicked.connect(self.jogPlus)
         btnJogMinus.clicked.connect(self.jogMinus)
@@ -182,9 +184,10 @@ class Window(QMainWindow):
     def stopMove(self):
         self.stage.stopMove(0, True)
 
-    def home(self):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
+    @Slot(int)
+    def home(self, idx):             # 키네시스 프로필에 설정된 홈으로 이동하지만 비동기처리 되므로 move_to(0) 권장
         print("home")
-        self.stage.home()
+        self.stage.home(idx)
 
     def jogPlus(self):
         #print("jogPlus")
@@ -229,8 +232,10 @@ class Window(QMainWindow):
 
     def updateStatus(self):
         status = self.stage.stage[0].get_status()
+        status2 = self.stage.status[0]
+
         #print(f"status: {status}")
-        self.lbStatus.setText(f"status: {status}")
+        self.lbStatus.setText(f"status: {status}, 2: {Status.get_name(status2)}")
 
     def checkMoving(self):
         # status = self.stage.get_status()
