@@ -4,6 +4,7 @@ from pylablib.devices import Thorlabs
 
 TAG = "stage"
 
+
 def use_mm(value):
     return value/1000
 
@@ -12,16 +13,38 @@ def use_um(value):
     return value/1000000
 
 
+class Status:
+    DISABLED = -1
+    DEFAULT = 0
+    IDLE = 1
+    JOGGING = 2
+    MOVING_NORMAL = 3
+    MOVING_TO_ZERO = 4
+    MOVING_TO_HOME = 5
+
+    @classmethod
+    def get_name(cls, code):
+        status_dict = {
+            cls.DISABLED: "DISABLED",
+            cls.DEFAULT: "DEFAULT",
+            cls.IDLE: "IDLE",
+            cls.JOGGING: "JOGGING",
+            cls.MOVING_NORMAL: "MOVING_NORMAL",
+            cls.MOVING_TO_ZERO: "MOVING_TO_ZERO",
+            cls.MOVING_TO_HOME: "MOVING_TO_HOME",
+        }
+        return status_dict.get(code, "UNKNOWN")
+
+
 class Stage(QThread):
     numberOfStages = 1
     stage = []
     limit = [(0, use_mm(50)), (0, use_mm(50)), (0, use_mm(50))]
     driveDir = ["+", "+", "+"]
-    stageConnected = [False, False, False]
-    homed = [False, False, False]
+    status = [Status.DISABLED for _ in range(3)]
+    homePosition = [0.0, 0.0, 0.0]
 
     connectedSignal = Signal(list)
-    homeingSignal = Signal()
     homedSignal = Signal()
     stoppingSignal = Signal(int)
     stoppedSignal = Signal(int, float)
@@ -31,7 +54,6 @@ class Stage(QThread):
     errPositionLimit = Signal(str)
     normalLogSignal = Signal(str)
 
-    homeTimer = QTimer()
     driveTimer0 = QTimer()
     driveTimer1 = QTimer()
     driveTimer2 = QTimer()
@@ -55,10 +77,12 @@ class Stage(QThread):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
                 self.stage[idx].setup_velocity(max_velocity=use_mm(5))
                 self.stage[idx].setup_jog(step_size=use_mm(1))
-                self.stageConnected[idx] = True
+                self.status[idx] = Status.DEFAULT
+                # self.stageConnected[idx] = True
 
             self.numberOfStages = numberOfStages
             self.initTimer()
+            self.stageMovedSignal.connect(self.onStageMoved)
 
         except CanNotDetectSomeDevicesException as e:
             print(f"$use: ${numberOfStages}, detected: ${len(devices)}, {e}")
@@ -66,11 +90,9 @@ class Stage(QThread):
             print("\nKinesisMotor에 연결할 수 없습니다.", e)
 
         finally:
-            self.connectedSignal.emit(self.stageConnected)
+            self.checkConnected()
 
     def initTimer(self):
-        self.homeTimer.timeout.connect(self.checkHome)
-
         self.driveTimer0.timeout.connect(self.jogToDrive0)
         self.driveTimer1.timeout.connect(self.jogToDrive1)
         self.driveTimer2.timeout.connect(self.jogToDrive2)
@@ -84,7 +106,8 @@ class Stage(QThread):
             stage.close()
 
     def checkConnected(self):
-        self.connectedSignal.emit(self.stageConnected)
+            stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
+            self.connectedSignal.emit(stageConnected)
 
     def setTimerInterval(self, interval):
         self.timerInterval = interval
@@ -123,24 +146,26 @@ class Stage(QThread):
             return True
 
     def getPosition(self, idx):
-        return self.stage[idx].get_position()
+        return self.stage[idx].get_position() - self.homePosition[idx]
 
-    def home(self):
-        self.homeingSignal.emit()
-        self.homed = [False for _ in range(self.numberOfStages)]
+    def home(self, idx):
+        print(f"{idx} home")
+        self.status[idx] = Status.MOVING_TO_ZERO
+        self.move(idx, 0)
 
-        for stage in self.stage:
-            stage.home()
-        self.homeTimer.start(self.timerInterval)
+    @Slot(int)
+    def onStageMoved(self, idx):
+        print(f"[{idx}]onStageMoved {Status.get_name(self.status[idx])}")
+        if self.status[idx] == Status.MOVING_TO_ZERO:
+            self.status[idx] = Status.MOVING_TO_HOME
+            self.jog(idx, "+")
+            self.checkMoving(idx)
+            return
 
-    def checkHome(self):
-        for idx, stage in enumerate(self.stage):
-            status = self.stage[idx].get_status()
-            if "homed" in status:
-                self.homed[idx] = True
-
-        if all(self.homed):
-            self.homeTimer.stop()
+        if self.status[idx] == Status.MOVING_TO_HOME:
+            self.status[idx] = Status.IDLE
+            self.homePosition[idx] = self.stage[idx].get_position()
+            print(f"homePosition: {self.homePosition[idx]}")
             self.homedSignal.emit()
 
     def jog(self, idx, direction):
@@ -153,12 +178,18 @@ class Stage(QThread):
             return
 
         if direction == "+":
-            if self.limit[idx][1] <= self.getPosition(idx):
+            if (self.limit[idx][1] <= self.getPosition(idx)
+                    and not (self.status[idx] == Status.MOVING_TO_ZERO
+                             or self.status[idx] == Status.MOVING_TO_HOME)):
+                print(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 return
             self.stage[idx].jog("+", kind="builtin")
         elif direction == "-":
-            if self.getPosition(idx) <= self.limit[idx][0]:
+            if (self.getPosition(idx) <= self.limit[idx][0]
+                    and not (self.status[idx] == Status.MOVING_TO_ZERO
+                             or self.status[idx] == Status.MOVING_TO_HOME)):
+                print(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 return
             self.stage[idx].jog("-", kind="builtin")
@@ -167,7 +198,9 @@ class Stage(QThread):
     def jogToDrive1(self): self.jog(1, self.driveDir[1])
     def jogToDrive2(self): self.jog(2, self.driveDir[2])
 
-    def driveStart(self, idx, direction):
+    def driveStart(self, idx, direction, isInitializing=False):
+        TAG = "[driveStart]"
+        print(f"{TAG} ${idx}, {direction}")
         '''
         direction: "+", "-"
         '''
@@ -181,11 +214,13 @@ class Stage(QThread):
             return
 
         if direction == "+":
-            if self.limit[idx][1] <= self.getPosition(idx):
+            if self.limit[idx][1] <= self.getPosition(idx) and self.status[idx] != Status.MOVING_TO_ZERO:
+                print(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 moveAble = False
         elif direction == "-":
-            if self.getPosition(idx) <= self.limit[idx][0]:
+            if self.getPosition(idx) <= self.limit[idx][0] and self.status[idx] != Status.MOVING_TO_ZERO:
+                print(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 moveAble = False
 
@@ -219,11 +254,15 @@ class Stage(QThread):
             self.driveTimer2.stop()
 
     def move(self, idx, position):
-        # print(f"{TAG}#{idx} {position}, {self.limit[idx][1]}, {self.limit[idx][0]}")
+        TAG = "[move]"
+        print(f"{TAG}#{idx} {position}, {Status.get_name(self.status[idx])}")
         METHOD = "[move]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
+
+        if self.status[idx] == Status.MOVING_TO_ZERO:
+            self.driveStart(idx, "-")
 
         if self.limit[idx][1] < position or position < self.limit[idx][0]:
             self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
@@ -248,7 +287,7 @@ class Stage(QThread):
             return
 
         status = self.stage[idx].get_status()
-        if printLog: print(f"{TAG}#{idx} {METHOD} status: {status}")
+        print(f"{TAG}#{idx} {METHOD} status: {status}")
         if (
                 "moving_fw" not in status and
                 "moving_bk" not in status and
@@ -257,11 +296,14 @@ class Stage(QThread):
         ):
             if idx == 0:
                 self.moveTimer0.stop()
+                self.driveTimer0.stop()
             elif idx == 1:
                 self.moveTimer1.stop()
+                self.driveTimer1.stop()
             else:
                 self.moveTimer2.stop()
-            #self.normalLogSignal.emit(f"{TAG}#{idx} {METHOD} 이동완료 position: {self.getPosition(idx)}")
+                self.driveTimer2.stop()
+
             if forStop:
                 self.stoppedSignal.emit(idx, self.getPosition(idx))
             else:
