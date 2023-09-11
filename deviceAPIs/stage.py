@@ -61,6 +61,7 @@ class Stage(QThread):
     moveTimer1 = QTimer()
     moveTimer2 = QTimer()
     timerInterval = 100
+    waitToBacklash = 1000
 
     def __init__(self, numberOfStages=1):
         super().__init__()
@@ -169,7 +170,7 @@ class Stage(QThread):
             return
 
         if self.status[idx] == Status.MOVING_TO_HOME:
-            QTimer.singleShot(self.timerInterval * 10, lambda: self.setHomePosition(idx))
+            QTimer.singleShot(self.waitToBacklash, lambda: self.setHomePosition(idx))
 
     @Slot(int)
     def setHomePosition(self, idx):
