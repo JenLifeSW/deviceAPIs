@@ -155,6 +155,7 @@ class Stage(QThread):
 
     @Slot(int)
     def onStageMoved(self, idx):
+        print(f"onStageMoved")
         if self.status[idx] == Status.MOVING_TO_GROUND:
             self.status[idx] = Status.MOVING_TO_HOME
             self.jog(idx, "+")
@@ -168,11 +169,15 @@ class Stage(QThread):
             return
 
         if self.status[idx] == Status.MOVING_TO_HOME:
-            self.status[idx] = Status.IDLE
-            self.homePosition[idx] = self.stage[idx].get_position()
-            self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
-            print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
-            self.homedSignal.emit(idx)
+            QTimer.singleShot(self.timerInterval * 10, lambda: self.setHomePosition(idx))
+
+    @Slot(int)
+    def setHomePosition(self, idx):
+        self.status[idx] = Status.IDLE
+        self.homePosition[idx] = self.stage[idx].get_position()
+        self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
+        print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
+        self.homedSignal.emit(idx)
 
     def jog(self, idx, direction):
         '''
