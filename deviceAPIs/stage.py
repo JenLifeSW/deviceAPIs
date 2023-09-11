@@ -78,6 +78,7 @@ class Stage(QThread):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
                 self.stage[idx].setup_velocity(max_velocity=use_mm(5))
                 self.stage[idx].setup_jog(step_size=use_mm(1))
+                print(f"{TAG}#{idx} velo_para: {self.stage[idx]._get_velocity_parameters()}")
                 self.status[idx] = Status.DEFAULT
                 # self.stageConnected[idx] = True
 
@@ -113,6 +114,9 @@ class Stage(QThread):
     def setTimerInterval(self, interval):
         self.timerInterval = interval
 
+    def getTimerInterval(self):
+        return self.timerInterval
+
     def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
         METHOD = "[setLimit]"
         print(f"{TAG}#{idx} {METHOD} {bottom}, {top}")
@@ -122,11 +126,11 @@ class Stage(QThread):
 
         self.limit[idx] = (bottom, top)
 
-    def setUpVelocity(self, idx, maxVelocity, acc):
-        self.stage[idx].setup_velocity(max_velocity=maxVelocity, acceleration=acc)
+    def setUpVelocity(self, idx, minVelocity=None, maxVelocity=None, acc=None):
+        self.stage[idx].setup_velocity(min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
 
-    def setUpJog(self, idx, size):
-        self.stage[idx].setup_jog(step_size=size)
+    def setUpJog(self, idx, size=None, minVelocity=None, maxVelocity=None, acc=None):
+        self.stage[idx].setup_jog(step_size=size, min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
 
     def setEnabled(self, idx, enable=True):
         self.stage[idx]._enable_channel(enable)
