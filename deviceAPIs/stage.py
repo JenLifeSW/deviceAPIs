@@ -19,7 +19,7 @@ class Status:
     IDLE = 1
     JOGGING = 2
     MOVING_NORMAL = 3
-    MOVING_TO_ZERO = 4
+    MOVING_TO_GROUND = 4
     MOVING_TO_HOME = 5
 
     @classmethod
@@ -30,7 +30,7 @@ class Status:
             cls.IDLE: "IDLE",
             cls.JOGGING: "JOGGING",
             cls.MOVING_NORMAL: "MOVING_NORMAL",
-            cls.MOVING_TO_ZERO: "MOVING_TO_ZERO",
+            cls.MOVING_TO_GROUND: "MOVING_TO_GROUND",
             cls.MOVING_TO_HOME: "MOVING_TO_HOME",
         }
         return status_dict.get(code, "UNKNOWN")
@@ -150,13 +150,13 @@ class Stage(QThread):
 
     def home(self, idx):
         print(f"{idx} home")
-        self.status[idx] = Status.MOVING_TO_ZERO
-        self.move(idx, 0)
+        self.status[idx] = Status.MOVING_TO_GROUND
+        self.moveToGround(idx)
 
     @Slot(int)
     def onStageMoved(self, idx):
         print(f"[{idx}]onStageMoved {Status.get_name(self.status[idx])}")
-        if self.status[idx] == Status.MOVING_TO_ZERO:
+        if self.status[idx] == Status.MOVING_TO_GROUND:
             self.status[idx] = Status.MOVING_TO_HOME
             self.jog(idx, "+")
             if idx == 0:
@@ -186,7 +186,7 @@ class Stage(QThread):
 
         if direction == "+":
             if (self.limit[idx][1] <= self.getPosition(idx)
-                    and not (self.status[idx] == Status.MOVING_TO_ZERO
+                    and not (self.status[idx] == Status.MOVING_TO_GROUND
                              or self.status[idx] == Status.MOVING_TO_HOME)):
                 print(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
@@ -194,7 +194,7 @@ class Stage(QThread):
             self.stage[idx].jog("+", kind="builtin")
         elif direction == "-":
             if (self.getPosition(idx) <= self.limit[idx][0]
-                    and not (self.status[idx] == Status.MOVING_TO_ZERO
+                    and not (self.status[idx] == Status.MOVING_TO_GROUND
                              or self.status[idx] == Status.MOVING_TO_HOME)):
                 print(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
@@ -221,12 +221,12 @@ class Stage(QThread):
             return
 
         if direction == "+":
-            if self.limit[idx][1] <= self.getPosition(idx) and self.status[idx] != Status.MOVING_TO_ZERO:
+            if self.limit[idx][1] <= self.getPosition(idx) and self.status[idx] != Status.MOVING_TO_GROUND:
                 print(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 상단 한계점 도달")
                 moveAble = False
         elif direction == "-":
-            if self.getPosition(idx) <= self.limit[idx][0] and self.status[idx] != Status.MOVING_TO_ZERO:
+            if self.getPosition(idx) <= self.limit[idx][0] and self.status[idx] != Status.MOVING_TO_GROUND:
                 print(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 하단 한계점 도달")
                 moveAble = False
@@ -269,9 +269,6 @@ class Stage(QThread):
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
-        if self.status[idx] == Status.MOVING_TO_ZERO:
-            self.driveStart(idx, "-")
-
         if self.limit[idx][1] < position or position < self.limit[idx][0]:
             print(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
             self.errPositionLimit.emit(f"{TAG}#{idx} {METHOD} 스테이지 한계점 이동불가 target:{position}, bot:{self.limit[idx][0]}, top:{self.limit[idx][1]}")
@@ -284,6 +281,23 @@ class Stage(QThread):
             self.moveTimer1.start(self.timerInterval)
         else:
             self.moveTimer2.start(self.timerInterval)
+
+    def moveToGround(self, idx):
+        TAG = ["moveToZero"]
+        print(f"{TAG} #{idx}")
+        if self.numberOfStages < idx:
+            self.errCannotDetect.emit(f"{TAG}#{idx} 스테이지를 찾을 수 없습니다.")
+            return
+
+        if self.status[idx] == Status.MOVING_TO_GROUND:
+            self.driveStart(idx, "-")
+
+        if idx == 0:
+            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer0.start(self.timerInterval))
+        elif idx == 1:
+            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer1.start(self.timerInterval))
+        else:
+            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer2.start(self.timerInterval))
 
     def checkMoving0(self): self.checkMoving(0)
     def checkMoving1(self): self.checkMoving(1)
