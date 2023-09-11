@@ -85,7 +85,7 @@ class Stage(QThread):
             self.stageMovedSignal.connect(self.onStageMoved)
 
         except CanNotDetectSomeDevicesException as e:
-            print(f"$use: ${numberOfStages}, detected: ${len(devices)}, {e}")
+            print(f"use: {numberOfStages}, detected: {len(devices)}, {e}")
         except Exception as e:
             print("\nKinesisMotor에 연결할 수 없습니다.", e)
 
@@ -113,7 +113,7 @@ class Stage(QThread):
         self.timerInterval = interval
 
     def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
-        METHOD = "setLimit"
+        METHOD = "[setLimit]"
         print(f"{TAG}#{idx} {METHOD} {bottom}, {top}")
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
@@ -149,13 +149,12 @@ class Stage(QThread):
         return self.stage[idx].get_position() - self.homePosition[idx]
 
     def home(self, idx):
-        print(f"{idx} home")
+        print(f"{TAG}#{idx} home")
         self.status[idx] = Status.MOVING_TO_GROUND
         self.moveToGround(idx)
 
     @Slot(int)
     def onStageMoved(self, idx):
-        print(f"[{idx}]onStageMoved {Status.get_name(self.status[idx])}")
         if self.status[idx] == Status.MOVING_TO_GROUND:
             self.status[idx] = Status.MOVING_TO_HOME
             self.jog(idx, "+")
@@ -172,14 +171,14 @@ class Stage(QThread):
             self.status[idx] = Status.IDLE
             self.homePosition[idx] = self.stage[idx].get_position()
             self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
-            print(f"homePosition: {self.homePosition[idx]}")
+            print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
             self.homedSignal.emit()
 
     def jog(self, idx, direction):
         '''
         direction: "+", "-"
         '''
-        METHOD = "jog"
+        METHOD = "[jog]"
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
             return
@@ -206,15 +205,13 @@ class Stage(QThread):
     def jogToDrive2(self): self.jog(2, self.driveDir[2])
 
     def driveStart(self, idx, direction, isInitializing=False):
-        TAG = "[driveStart]"
-        print(f"{TAG} ${idx}, {direction}")
-        '''
+        """
         direction: "+", "-"
-        '''
-        METHOD = "driveStart"
-        '''
-        limit 구현
-        '''
+        """
+
+        METHOD = "[driveStart]"
+        print(f"{TAG}#{idx} {METHOD}, {direction}")
+
         moveAble = True
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
@@ -261,10 +258,9 @@ class Stage(QThread):
             self.driveTimer2.stop()
 
     def move(self, idx, position):
-        TAG = "[move]"
-        print(f"{TAG}#{idx} {position}, {self.homePosition[idx]}, {Status.get_name(self.status[idx])}")
-        position = position + self.homePosition[idx]
         METHOD = "[move]"
+        print(f"{TAG}#{idx} {METHOD} {position}, {self.homePosition[idx]}, {Status.get_name(self.status[idx])}")
+        position = position + self.homePosition[idx]
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
@@ -283,8 +279,6 @@ class Stage(QThread):
             self.moveTimer2.start(self.timerInterval)
 
     def moveToGround(self, idx):
-        TAG = ["moveToZero"]
-        print(f"{TAG} #{idx}")
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} 스테이지를 찾을 수 없습니다.")
             return
@@ -310,7 +304,6 @@ class Stage(QThread):
             return
 
         status = self.stage[idx].get_status()
-        print(f"{TAG}#{idx} {METHOD} status: {status}")
         if (
                 "moving_fw" not in status and
                 "moving_bk" not in status and
