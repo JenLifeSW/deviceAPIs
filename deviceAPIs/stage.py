@@ -45,7 +45,7 @@ class Stage(QThread):
     homePosition = [0.0, 0.0, 0.0]
 
     connectedSignal = Signal(list)
-    homedSignal = Signal()
+    homedSignal = Signal(int)
     stoppingSignal = Signal(int)
     stoppedSignal = Signal(int, float)
 
@@ -172,7 +172,7 @@ class Stage(QThread):
             self.homePosition[idx] = self.stage[idx].get_position()
             self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
             print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
-            self.homedSignal.emit()
+            self.homedSignal.emit(idx)
 
     def jog(self, idx, direction):
         '''
