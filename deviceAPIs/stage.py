@@ -12,6 +12,7 @@ def use_mm(value):
 def use_um(value):
     return value/1000000
 
+limit = [(0.0, use_mm(50.0)), (0.0, use_mm(50.0)), (0.0, use_mm(50.0))]
 
 class Status:
     DISABLED = -1
@@ -39,7 +40,7 @@ class Status:
 class Stage(QThread):
     numberOfStages = 1
     stage = []
-    limit = [(0.0, use_mm(50.0)), (0.0, use_mm(50.0)), (0.0, use_mm(50.0))]
+    limit = limit[:]
     driveDir = ["+", "+", "+"]
     status = [Status.DISABLED for _ in range(3)]
     homePosition = [0.0, 0.0, 0.0]
@@ -180,7 +181,7 @@ class Stage(QThread):
     def setHomePosition(self, idx):
         self.status[idx] = Status.IDLE
         self.homePosition[idx] = self.stage[idx].get_position()
-        self.limit[idx] = (self.limit[idx][0] + self.homePosition[idx], self.limit[idx][1] + self.homePosition[idx])
+        self.limit[idx] = (limit[idx][0] + self.homePosition[idx], limit[idx][1] + self.homePosition[idx])
         print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
         self.homedSignal.emit(idx)
 
