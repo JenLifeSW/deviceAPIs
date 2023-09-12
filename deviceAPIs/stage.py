@@ -77,11 +77,9 @@ class Stage(QThread):
 
             for idx, device in enumerate(devices):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
-                self.stage[idx].setup_velocity(max_velocity=use_mm(5))
-                self.stage[idx].setup_jog(step_size=use_mm(1))
-                print(f"{TAG}#{idx} velo_para: {self.stage[idx]._get_velocity_parameters()}")
+                self.setupVelocity(idx, maxVelocity=use_mm(5))
+                self.setupJog(idx, size=use_mm(1))
                 self.status[idx] = Status.DEFAULT
-                # self.stageConnected[idx] = True
 
             self.numberOfStages = numberOfStages
             self.initTimer()
@@ -127,11 +125,17 @@ class Stage(QThread):
 
         self.limit[idx] = (bottom, top)
 
-    def setUpVelocity(self, idx, minVelocity=None, maxVelocity=None, acc=None):
-        self.stage[idx].setup_velocity(min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
+    def setupVelocity(self, idx, minVelocity=None, maxVelocity=None, acc=None):
+        return self.stage[idx].setup_velocity(min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
 
-    def setUpJog(self, idx, size=None, minVelocity=None, maxVelocity=None, acc=None):
-        self.stage[idx].setup_jog(step_size=size, min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
+    def setupJog(self, idx, size=None, minVelocity=None, maxVelocity=None, acc=None):
+        return self.stage[idx].setup_jog(step_size=size, min_velocity=minVelocity, max_velocity=maxVelocity, acceleration=acc)
+
+    def getVelocityParameters(self, idx):
+        return self.stage[idx]._get_velocity_parameters()
+
+    def getJogParameters(self, idx):
+        return self.stage[idx]._get_jog_parameters()
 
     def setEnabled(self, idx, enable=True):
         self.stage[idx]._enable_channel(enable)
@@ -221,7 +225,7 @@ class Stage(QThread):
         """
 
         METHOD = "[driveStart]"
-        print(f"{TAG}#{idx} {METHOD}, {direction}")
+        # print(f"{TAG}#{idx} {METHOD}, {direction}")
 
         moveAble = True
         if self.numberOfStages < idx:
