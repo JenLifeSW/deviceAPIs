@@ -56,9 +56,9 @@ class Stage(QThread):
     driveTimer0 = QTimer()
     driveTimer1 = QTimer()
     driveTimer2 = QTimer()
-    moveTimer0 = QTimer()
-    moveTimer1 = QTimer()
-    moveTimer2 = QTimer()
+    checkMovingTimer0 = QTimer()
+    checkMovingTimer1 = QTimer()
+    checkMovingTimer2 = QTimer()
     timerInterval = 100
     waitToHomed = 2000
 
@@ -96,9 +96,9 @@ class Stage(QThread):
         self.driveTimer1.timeout.connect(self.jogToDrive1)
         self.driveTimer2.timeout.connect(self.jogToDrive2)
 
-        self.moveTimer0.timeout.connect(self.checkMoving0)
-        self.moveTimer1.timeout.connect(self.checkMoving1)
-        self.moveTimer2.timeout.connect(self.checkMoving2)
+        self.checkMovingTimer0.timeout.connect(self.checkMoving0)
+        self.checkMovingTimer1.timeout.connect(self.checkMoving1)
+        self.checkMovingTimer2.timeout.connect(self.checkMoving2)
 
     def close(self):
         for stage in self.stage:
@@ -159,6 +159,38 @@ class Stage(QThread):
     def getPosition(self, idx):
         return self.stage[idx].get_position()
 
+    def startDriveTimer(self, idx):
+        if idx == 0:
+            self.driveTimer0.start(self.timerInterval)
+        elif idx == 1:
+            self.driveTimer1.start(self.timerInterval)
+        else:
+            self.driveTimer2.start(self.timerInterval)
+
+    def stopDriveTimer(self, idx):
+        if idx == 0:
+            self.driveTimer0.stop()
+        elif idx == 1:
+            self.driveTimer1.stop()
+        else:
+            self.driveTimer2.stop()
+
+    def startCheckMovingTimer(self, idx):
+        if idx == 0:
+            self.checkMovingTimer0.start(self.timerInterval)
+        elif idx == 1:
+            self.checkMovingTimer1.start(self.timerInterval)
+        else:
+            self.checkMovingTimer2.start(self.timerInterval)
+
+    def stopCheckMovingTimer(self, idx):
+        if idx == 0:
+            self.checkMovingTimer0.stop()
+        elif idx == 1:
+            self.checkMovingTimer1.stop()
+        else:
+            self.checkMovingTimer2.stop()
+
     def home(self, idx, moveTo=False):
         print(f"{TAG}#{idx} home")
         if self.isHomed(idx):
@@ -177,12 +209,7 @@ class Stage(QThread):
             self.status[idx] = Status.MOVING_TO_HOME
             self.stage[idx]._home(sync=False, force=True)
 
-            if idx == 0:
-                self.moveTimer0.start(self.timerInterval)
-            elif idx == 1:
-                self.moveTimer1.start(self.timerInterval)
-            else:
-                self.moveTimer2.start(self.timerInterval)
+            self.startCheckMovingTimer(idx)
 
             return
 
@@ -255,19 +282,9 @@ class Stage(QThread):
 
         self.driveDir[idx] = direction
         if moveAble:
-            if idx == 0:
-                self.driveTimer0.start(self.timerInterval)
-            elif idx == 1:
-                self.driveTimer1.start(self.timerInterval)
-            else:
-                self.driveTimer2.start(self.timerInterval)
+            self.startDriveTimer(idx)
         else:
-            if idx == 0:
-                self.driveTimer0.stop()
-            elif idx == 1:
-                self.driveTimer1.stop()
-            else:
-                self.driveTimer2.stop()
+            self.stopDriveTimer(idx)
 
     def driveStop(self, idx):
         METHOD = "[driveStop]"
@@ -275,12 +292,7 @@ class Stage(QThread):
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD} 스테이지를 찾을 수 없습니다.")
             return
 
-        if idx == 0:
-            self.driveTimer0.stop()
-        elif idx == 1:
-            self.driveTimer1.stop()
-        else:
-            self.driveTimer2.stop()
+        self.stopDriveTimer(idx)
 
     def move(self, idx, position):
         METHOD = "[move]"
@@ -294,22 +306,12 @@ class Stage(QThread):
             return
 
         self.stage[idx].move_to(position)
-        if idx == 0:
-            self.moveTimer0.start(self.timerInterval)
-        elif idx == 1:
-            self.moveTimer1.start(self.timerInterval)
-        else:
-            self.moveTimer2.start(self.timerInterval)
+        self.startCheckMovingTimer(idx)
 
     def moveToGround(self, idx):
         self.driveStart(idx, "-")
 
-        if idx == 0:
-            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer0.start(self.timerInterval))
-        elif idx == 1:
-            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer1.start(self.timerInterval))
-        else:
-            QTimer.singleShot(self.timerInterval, lambda: self.moveTimer2.start(self.timerInterval))
+        QTimer.singleShot(self.timerInterval, lambda: self.startCheckMovingTimer(idx))
 
     def checkMoving0(self): self.checkMoving(0)
     def checkMoving1(self): self.checkMoving(1)
@@ -322,15 +324,8 @@ class Stage(QThread):
             return
 
         if not self.isMoving(idx):
-            if idx == 0:
-                self.moveTimer0.stop()
-                self.driveTimer0.stop()
-            elif idx == 1:
-                self.moveTimer1.stop()
-                self.driveTimer1.stop()
-            else:
-                self.moveTimer2.stop()
-                self.driveTimer2.stop()
+            self.stopCheckMovingTimer(idx)
+            self.stopDriveTimer(idx)
 
             if forStop:
                 self.stoppedSignal.emit(idx, self.getPosition(idx))
