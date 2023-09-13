@@ -75,8 +75,8 @@ class Stage(QThread):
 
             for idx, device in enumerate(devices):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
-                self.setupVelocity(idx, maxVelocity=use_mm(5))
-                self.setupJog(idx, size=use_mm(1))
+                self.setupVelocity(idx, maxVelocity=use_mm(1), acc=use_mm(1))
+                self.setupJog(idx, size=use_um(500), acc=use_mm(1))
                 self.status[idx] = Status.DEFAULT
 
             self.numberOfStages = numberOfStages
