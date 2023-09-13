@@ -396,7 +396,7 @@ class Window(QMainWindow):
         self.lbPosition.setText(f"position: {formated}mm ({microFormated}um)")
 
     def updateStatus(self):
-        status = self.stage.stage[0].get_status()
+        status = self.stage.getStatus(0)
         status2 = self.stage.status[0]
 
         #print(f"status: {status}")

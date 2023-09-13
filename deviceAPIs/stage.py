@@ -76,7 +76,7 @@ class Stage(QThread):
             for idx, device in enumerate(devices):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
                 self.setupVelocity(idx, maxVelocity=use_mm(1), acc=use_mm(1))
-                self.setupJog(idx, size=use_um(500), acc=use_mm(1))
+                self.setupJog(idx, size=use_mm(1), acc=use_mm(1))
                 self.status[idx] = Status.DEFAULT
 
             self.numberOfStages = numberOfStages
@@ -103,6 +103,9 @@ class Stage(QThread):
     def close(self):
         for stage in self.stage:
             stage.close()
+
+    def getStatus(self, idx):
+        return self.stage[idx].get_status()
 
     def checkConnected(self):
         stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
@@ -139,10 +142,10 @@ class Stage(QThread):
         self.stage[idx]._enable_channel(enable)
 
     def isEnabled(self, idx):
-        return "enabled" in self.stage[idx].get_status()
+        return "enabled" in self.getStatus(idx)
 
     def isMoving(self, idx):
-        status = self.stage[idx].get_status()
+        status = self.getStatus(idx)
         if (
                 "moving_fw" not in status and
                 "moving_bk" not in status and
@@ -312,7 +315,7 @@ class Stage(QThread):
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
-        status = self.stage[idx].get_status()
+        status = self.getStatus(idx)
         if (
                 "moving_fw" not in status and
                 "moving_bk" not in status and
