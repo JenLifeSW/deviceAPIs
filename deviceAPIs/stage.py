@@ -60,7 +60,7 @@ class Stage(QThread):
     moveTimer1 = QTimer()
     moveTimer2 = QTimer()
     timerInterval = 100
-    waitToBacklash = 2000
+    waitToHomed = 2000
 
     def __init__(self, numberOfStages=1):
         super().__init__()
@@ -76,7 +76,7 @@ class Stage(QThread):
             for idx, device in enumerate(devices):
                 self.stage.append(Thorlabs.KinesisMotor(device[0], "MTS50-Z8"))
                 self.setupVelocity(idx, maxVelocity=use_mm(1), acc=use_mm(1))
-                self.setupJog(idx, size=use_mm(1), acc=use_mm(1))
+                self.setupJog(idx, size=use_mm(1), maxVelocity=use_mm(1), acc=use_mm(1))
                 self.status[idx] = Status.DEFAULT
 
             self.numberOfStages = numberOfStages
@@ -117,6 +117,9 @@ class Stage(QThread):
     def getTimerInterval(self):
         return self.timerInterval
 
+    def isHomed(self, idx):
+        return "homed" in self.getStatus(idx)
+
     def setLimit(self, idx, bottom=use_mm(0), top=use_mm(50)):
         METHOD = "[setLimit]"
         print(f"{TAG}#{idx} {METHOD} {bottom}, {top}")
@@ -146,21 +149,24 @@ class Stage(QThread):
 
     def isMoving(self, idx):
         status = self.getStatus(idx)
-        if (
-                "moving_fw" not in status and
-                "moving_bk" not in status and
-                "jogging_fw" not in status and
-                "jogging_bk" not in status
-        ):
-            return False
-        else:
-            return True
+        return (
+                "moving_fw" in status or
+                "moving_bk" in status or
+                "jogging_fw" in status or
+                "jogging_bk" in status
+        )
 
     def getPosition(self, idx):
         return self.stage[idx].get_position()
 
-    def home(self, idx):
+    def home(self, idx, moveTo=False):
         print(f"{TAG}#{idx} home")
+        if self.isHomed(idx):
+            if not moveTo:
+                print(f"{TAG} #{idx} homed")
+                self.homedSignal.emit(idx)
+                return
+
         self.status[idx] = Status.MOVING_TO_GROUND
         self.moveToGround(idx)
 
@@ -169,7 +175,8 @@ class Stage(QThread):
         print(f"onStageMoved")
         if self.status[idx] == Status.MOVING_TO_GROUND:
             self.status[idx] = Status.MOVING_TO_HOME
-            self.jog(idx, "+")
+            self.stage[idx]._home(sync=False, force=True)
+
             if idx == 0:
                 self.moveTimer0.start(self.timerInterval)
             elif idx == 1:
@@ -180,13 +187,17 @@ class Stage(QThread):
             return
 
         if self.status[idx] == Status.MOVING_TO_HOME:
-            QTimer.singleShot(self.waitToBacklash, lambda: self.setHomePosition(idx))
+            QTimer.singleShot(self.waitToHomed, lambda: self.setHomed(idx))
 
     @Slot(int)
-    def setHomePosition(self, idx):
-        self.status[idx] = Status.IDLE
-        self.stage[idx]._set_position_reference()
-        self.homedSignal.emit(idx)
+    def setHomed(self, idx):
+        if not self.isMoving(idx):
+            print(f"{TAG}#{idx} homed")
+            self.status[idx] = Status.IDLE
+            self.homedSignal.emit(idx)
+            return
+
+        QTimer.singleShot(self.waitToHomed, lambda: self.setHomed(idx))
 
     def jog(self, idx, direction):
         '''
@@ -291,12 +302,7 @@ class Stage(QThread):
             self.moveTimer2.start(self.timerInterval)
 
     def moveToGround(self, idx):
-        if self.numberOfStages < idx:
-            self.errCannotDetect.emit(f"{TAG}#{idx} 스테이지를 찾을 수 없습니다.")
-            return
-
-        if self.status[idx] == Status.MOVING_TO_GROUND:
-            self.driveStart(idx, "-")
+        self.driveStart(idx, "-")
 
         if idx == 0:
             QTimer.singleShot(self.timerInterval, lambda: self.moveTimer0.start(self.timerInterval))
@@ -315,13 +321,7 @@ class Stage(QThread):
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
 
-        status = self.getStatus(idx)
-        if (
-                "moving_fw" not in status and
-                "moving_bk" not in status and
-                "jogging_fw" not in status and
-                "jogging_bk" not in status
-        ):
+        if not self.isMoving(idx):
             if idx == 0:
                 self.moveTimer0.stop()
                 self.driveTimer0.stop()
