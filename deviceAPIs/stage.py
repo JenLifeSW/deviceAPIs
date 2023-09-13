@@ -12,7 +12,6 @@ def use_mm(value):
 def use_um(value):
     return value/1000000
 
-limit = [(0.0, use_mm(50.0)), (0.0, use_mm(50.0)), (0.0, use_mm(50.0))]
 
 class Status:
     DISABLED = -1
@@ -40,10 +39,9 @@ class Status:
 class Stage(QThread):
     numberOfStages = 1
     stage = []
-    limit = limit[:]
+    limit = [(0.0, use_mm(50.0)), (0.0, use_mm(50.0)), (0.0, use_mm(50.0))]
     driveDir = ["+", "+", "+"]
     status = [Status.DISABLED for _ in range(3)]
-    homePosition = [0.0, 0.0, 0.0]
 
     connectedSignal = Signal(list)
     homedSignal = Signal(int)
@@ -62,7 +60,7 @@ class Stage(QThread):
     moveTimer1 = QTimer()
     moveTimer2 = QTimer()
     timerInterval = 100
-    waitToBacklash = 1000
+    waitToBacklash = 2000
 
     def __init__(self, numberOfStages=1):
         super().__init__()
@@ -156,7 +154,7 @@ class Stage(QThread):
             return True
 
     def getPosition(self, idx):
-        return self.stage[idx].get_position() - self.homePosition[idx]
+        return self.stage[idx].get_position()
 
     def home(self, idx):
         print(f"{TAG}#{idx} home")
@@ -184,9 +182,7 @@ class Stage(QThread):
     @Slot(int)
     def setHomePosition(self, idx):
         self.status[idx] = Status.IDLE
-        self.homePosition[idx] = self.stage[idx].get_position()
-        self.limit[idx] = (limit[idx][0] + self.homePosition[idx], limit[idx][1] + self.homePosition[idx])
-        print(f"{TAG}#{idx} homePosition: {self.homePosition[idx]}")
+        self.stage[idx]._set_position_reference()
         self.homedSignal.emit(idx)
 
     def jog(self, idx, direction):
@@ -274,8 +270,6 @@ class Stage(QThread):
 
     def move(self, idx, position):
         METHOD = "[move]"
-        print(f"{TAG}#{idx} {METHOD} {position}, {self.homePosition[idx]}, {Status.get_name(self.status[idx])}")
-        position = position + self.homePosition[idx]
         if self.numberOfStages < idx:
             self.errCannotDetect.emit(f"{TAG}#{idx} {METHOD}스테이지를 찾을 수 없습니다.")
             return
