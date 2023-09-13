@@ -105,8 +105,8 @@ class Stage(QThread):
             stage.close()
 
     def checkConnected(self):
-            stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
-            self.connectedSignal.emit(stageConnected)
+        stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
+        self.connectedSignal.emit(stageConnected)
 
     def setTimerInterval(self, interval):
         self.timerInterval = interval
