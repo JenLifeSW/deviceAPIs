@@ -100,22 +100,22 @@ class Stage(QThread):
         self.checkMovingTimer1.timeout.connect(self.checkMoving1)
         self.checkMovingTimer2.timeout.connect(self.checkMoving2)
 
-    def close(self):
-        for stage in self.stage:
-            stage.close()
-
-    def getStatus(self, idx):
-        return self.stage[idx].get_status()
-
-    def checkConnected(self):
-        stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
-        self.connectedSignal.emit(stageConnected)
-
     def setTimerInterval(self, interval):
         self.timerInterval = interval
 
     def getTimerInterval(self):
         return self.timerInterval
+
+    def close(self):
+        for stage in self.stage:
+            stage.close()
+
+    def checkConnected(self):
+        stageConnected = [self.status[idx] != Status.DISABLED for idx in range(3)]
+        self.connectedSignal.emit(stageConnected)
+
+    def getStatus(self, idx):
+        return self.stage[idx].get_status()
 
     def isHomed(self, idx):
         return "homed" in self.getStatus(idx)
@@ -191,17 +191,6 @@ class Stage(QThread):
         else:
             self.checkMovingTimer2.stop()
 
-    def home(self, idx, moveTo=False):
-        print(f"{TAG}#{idx} home")
-        if self.isHomed(idx):
-            if not moveTo:
-                print(f"{TAG} #{idx} homed")
-                self.homedSignal.emit(idx)
-                return
-
-        self.status[idx] = Status.MOVING_TO_GROUND
-        self.moveToGround(idx)
-
     @Slot(int)
     def onStageMoved(self, idx):
         print(f"onStageMoved")
@@ -215,6 +204,17 @@ class Stage(QThread):
 
         if self.status[idx] == Status.MOVING_TO_HOME:
             QTimer.singleShot(self.waitToHomed, lambda: self.setHomed(idx))
+
+    def home(self, idx, moveTo=False):
+        print(f"{TAG}#{idx} home")
+        if self.isHomed(idx):
+            if not moveTo:
+                print(f"{TAG} #{idx} homed")
+                self.homedSignal.emit(idx)
+                return
+
+        self.status[idx] = Status.MOVING_TO_GROUND
+        self.moveToGround(idx)
 
     @Slot(int)
     def setHomed(self, idx):
