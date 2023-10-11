@@ -1,8 +1,8 @@
 import sys
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Slot
-from PySide6.QtGui import QImage, QPixmap, QScreen
+from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 from deviceAPIs.camera import Camera
 
@@ -11,13 +11,10 @@ class MainWin(QWidget):
         super().__init__()
         self.camera = Camera()
         self.setFixedSize(800, 600)
-        # qtRectangle = self.frameGeometry()
-        # self.move(qtRectangle.topLeft())
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle("Camera Viewer")
-        # self.setGeometry(100, 100, 800, 600)
 
         self.image_label = QLabel(self)
         self.image_label.setScaledContents(True)

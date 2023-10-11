@@ -1,14 +1,9 @@
 import numpy as np
-from PySide6.QtCore import QObject, Signal, Slot, Qt
-from PySide6.QtGui import QScreen, QPixmap, QImage
-from PySide6.QtWidgets import QLabel, QApplication, QWidget, QCheckBox, QMessageBox, QPushButton
-
-import sys
+from PySide6.QtCore import QObject, Signal, Slot
 from deviceAPIs.camera import toupcam
 from deviceAPIs.camera.CameraUnit import ToupcamUnit, CVUnit
 import cv2 as cv2
 
-# camera_backends = [cv2.CAP_V4L, cv2.CAP_AVFOUNDATION, cv2.CAP_GSTREAMER, cv2.CAP_FFMPEG]
 
 class Camera(QObject):
     signal_image = Signal(int, np.ndarray)
@@ -42,7 +37,7 @@ class Camera(QObject):
         cvcam_units = []
         non_working_ports = 0
         dev_port = 0
-        while non_working_ports < 4:  # if there are more than 5 non working ports stop the testing.
+        while non_working_ports < 4:  # if there are more than 3 non working ports stop the testing.
             camera = cv2.VideoCapture(dev_port)
 
             if not camera.isOpened():
