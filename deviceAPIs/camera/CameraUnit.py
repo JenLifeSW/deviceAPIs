@@ -7,6 +7,8 @@ from PySide6.QtCore import QObject, Signal, Slot, Qt, QThread
 
 from deviceAPIs.camera import toupcam
 
+# MAX_RESOLUTION = [10240, 4320]
+
 
 class CamType:
     DEFAULT = 0
@@ -23,7 +25,7 @@ class CamType:
         return cam_type.get(num, "UNKNOWN")
 
 
-class CameraUnit(QObject):
+class CameraUnit(QThread):
     signal_image = Signal(np.ndarray)
     exception = Signal(str)
 
@@ -34,9 +36,12 @@ class CameraUnit(QObject):
         self.cam_id = cam_id
         self.model = model
         self.cam = None
-        self.buf = None      # video buffer
-        self.w = 0           # video width
-        self.h = 0           # video height
+        self.buf = None  # video buffer
+        self.width = 0  # video width
+        self.height = 0  # video height
+
+    def run(self):
+        pass
 
     def is_same(self, camera_unit):
         pass
@@ -52,6 +57,9 @@ class ToupcamUnit(CameraUnit):
     def __init__(self, name, cam_id, model):
         super().__init__(name, cam_id, model)
         self.type = CamType.TOUPCAM
+
+    def run(self):
+        pass
 
     def is_same(self, camera_unit):
         return self.cam_id == camera_unit.cam_id and self.name == camera_unit.name
@@ -89,7 +97,7 @@ class ToupcamUnit(CameraUnit):
             except toupcam.HRESULTException as e:
                 ctx.exception.emit(f"pull image failed: {e}")
             else:
-                img_np = np.frombuffer(ctx.buf, dtype=np.uint8).reshape((ctx.h, ctx.w, 3))
+                img_np = np.frombuffer(ctx.buf, dtype=np.uint8).reshape((ctx.height, ctx.width, 3))
                 ctx.signal_image.emit(img_np)
 
     def change_auto_exposure(self, state):
@@ -97,10 +105,15 @@ class ToupcamUnit(CameraUnit):
             self.cam.put_AutoExpoEnable(state == Qt.Checked)
 
 
-class CVUnit(CameraUnit, QThread):
+class CVUnit(CameraUnit):
     def __init__(self, cam_id):
         super().__init__(cam_id=cam_id)
         self.type = CamType.CV
+
+    def run(self):
+        while True:
+            ret, frame = self.cam.read()
+            self.signal_image.emit(frame)
 
     def is_same(self, camera_unit):
         pass
@@ -110,6 +123,21 @@ class CVUnit(CameraUnit, QThread):
         if not self.cam.isOpened():
             self.exception.emit(f"failed to open cv2 camera")
             return
+
+        # self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, MAX_RESOLUTION[0])
+        # self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, MAX_RESOLUTION[1])
+        #
+        # _, frame = self.cam.read()
+        # dim = frame.shape[:1]
+        # self.width = dim[1]
+        # self.height = dim[0]
+        #
+        # self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        # self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+
+        self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
         self.start()
 
     def close(self, event):
@@ -117,16 +145,3 @@ class CVUnit(CameraUnit, QThread):
             return
         self.cam.release()
         self.cam = None
-
-    def run(self):
-        while True:
-            ret, frame = self.cam.read()
-            self.signal_image.emit(frame)
-
-    @Slot()
-    def get_image(self):
-        ret, frame = self.cam.read()
-        if not ret:
-            self.exception.emit("can not read cv2 frame")
-            return
-        self.signal_image.emit(frame)

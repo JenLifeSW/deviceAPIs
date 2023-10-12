@@ -3,26 +3,32 @@ import sys
 import numpy as np
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QHBoxLayout, QWidget
 from deviceAPIs.camera import Camera
 
 class MainWin(QWidget):
     def __init__(self):
         super().__init__()
         self.camera = Camera()
-        self.setFixedSize(800, 600)
+        self.resize(800, 600)
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle("Camera Viewer")
-
-        self.image_label = QLabel(self)
+        self.widget = QWidget(self)
+        self.image_label = QLabel(self.widget)
         self.image_label.setScaledContents(True)
         self.image_label.resize(self.geometry().width(), self.geometry().height())
-        self.image_label.setAlignment(Qt.AlignCenter)
+        # self.image_label.setAlignment(Qt.AlignCenter)
 
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.image_label)
+        # self.image_label2 = QLabel(self)
+        # self.image_label2.setScaledContents(True)
+        # self.image_label2.resize(self.geometry().width()/2, self.geometry().height())
+        # self.image_label2.setAlignment(Qt.AlignCenter)
+
+        self.layout = QHBoxLayout()
+        self.layout.addWidget(self.widget)
+        # self.layout.addWidget(self.image_label2)
         self.setLayout(self.layout)
         self.camera.signal_image.connect(lambda idx, image: self.update_image(idx, image))
 
@@ -35,6 +41,7 @@ class MainWin(QWidget):
         if len(camera_list) == 0:
             return
         self.connect_to_camera(camera_list[0])
+        # self.connect_to_camera(camera_list[1])
 
     def connect_to_camera(self, idx):
         self.camera.connect_to_camera(idx)
@@ -47,10 +54,14 @@ class MainWin(QWidget):
             pixmap = QPixmap.fromImage(qimage)
 
             # 이미지 표시
-            self.image_label.setPixmap(pixmap)
+            if idx == 0:
+                self.image_label.setPixmap(pixmap)
+                self.image_label.resize(self.geometry().width(), self.geometry().height())
+            # else:
+            #     self.image_label2.setPixmap(pixmap)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = MainWin()
     win.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
