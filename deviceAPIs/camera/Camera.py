@@ -45,7 +45,7 @@ class Camera(QObject):
                 dev_port += 1
                 continue
             is_reading, img = camera.read()
-            if is_reading:
+            if not is_reading:
                 non_working_ports += 1
                 dev_port += 1
                 continue
