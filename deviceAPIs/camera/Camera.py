@@ -49,7 +49,19 @@ class Camera(QObject):
                 non_working_ports += 1
                 dev_port += 1
                 continue
+            camera_available = True
             cvcam_unit = CVUnit(cam_id=dev_port)
+
+            for using_camera in self.using_cameras:
+                if using_camera.is_same(cvcam_unit):
+                    print("is using")
+                    camera_available = False
+                    break
+            if not camera_available:
+                non_working_ports += 1
+                dev_port += 1
+                continue
+
             cvcam_units.append(cvcam_unit)
             dev_port += 1
         return cvcam_units

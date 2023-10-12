@@ -116,7 +116,7 @@ class CVUnit(CameraUnit):
             self.signal_image.emit(frame)
 
     def is_same(self, camera_unit):
-        pass
+        return self.cam_id == camera_unit.cam_id
 
     def connect_to_camera(self):
         self.cam = cv2.VideoCapture(self.cam_id)
