@@ -71,9 +71,9 @@ class ToupcamUnit(CameraUnit):
         except toupcam.HRESULTException as e:
             self.exception.emit(f"failed to open camera: {e}")
         else:
-            self.w, self.h = self.cam.get_Size()
+            self.width, self.height = self.cam.get_Size()
             print(f"size: {self.cam.get_Size()}")
-            bufsize = ((self.w * 24 + 31) // 32 * 4) * self.h
+            bufsize = ((self.width * 24 + 31) // 32 * 4) * self.height
             self.buf = bytes(bufsize)
             print(self.buf.__sizeof__())
             try:
