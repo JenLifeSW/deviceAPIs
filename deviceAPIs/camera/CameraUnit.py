@@ -100,9 +100,46 @@ class ToupcamUnit(CameraUnit):
                 img_np = np.frombuffer(ctx.buf, dtype=np.uint8).reshape((ctx.height, ctx.width, 3))
                 ctx.signal_image.emit(img_np)
 
-    def change_auto_exposure(self, state):
+    def get_auto_exposure(self):
         if self.cam is not None:
-            self.cam.put_AutoExpoEnable(state == Qt.Checked)
+            return self.cam.get_AutoExpoEnable()
+
+    def set_auto_exposure(self, state):
+        if self.cam is not None:
+            self.cam.put_AutoExpoEnable(state)
+
+    def get_expo_time(self):
+        if self.cam is not None:
+            return self.cam.get_ExpoTime()
+
+    def set_expo_time(self, expo_time):
+        if self.cam is not None:
+            self.cam.put_ExpoTime(int(expo_time))
+
+    def get_expo_a_gain(self):
+        if self.cam is not None:
+            return self.cam.get_ExpoAGain()
+
+    def set_expo_a_gain(self, a_gain):
+        if self.cam is not None:
+            self.cam.put_ExpoAGain(a_gain)
+
+    def get_white_balance_gain(self):
+        if self.cam is not None:
+            return self.cam.get_WhiteBalanceGain()
+
+    def set_white_balance_gain(self, a_gain):
+        if self.cam is not None:
+            self.cam.put_WhiteBalanceGain(a_gain)
+
+    def get_black_balance(self):
+        if self.cam is not None:
+            return self.cam.get_BlackBalance()
+
+    def set_black_balance(self, a_sub):
+        if self.cam is not None:
+            self.cam.put_BlackBalance(a_sub)
+
 
 
 class CVUnit(CameraUnit):
